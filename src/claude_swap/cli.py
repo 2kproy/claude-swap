@@ -1178,7 +1178,7 @@ The original flag spellings (%(prog)s --switch, %(prog)s --list, ...) keep worki
         metavar="SECONDS",
         help=(
             "With 'import-usage': keep this machine from fetching the "
-            "imported accounts for this many seconds"
+            "imported accounts for this many seconds (0 lifts an earlier hold)"
         ),
     )
     parser.add_argument(
@@ -1467,7 +1467,7 @@ The original flag spellings (%(prog)s --switch, %(prog)s --list, ...) keep worki
         elif args.import_usage:
             from claude_swap.transfer import import_usage
 
-            import_usage(switcher, args.import_usage, hold_s=args.hold or 0.0)
+            import_usage(switcher, args.import_usage, hold_s=args.hold)
         elif args.tui:
             from claude_swap.tui import run as tui_run
 
