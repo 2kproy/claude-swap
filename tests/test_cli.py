@@ -670,7 +670,7 @@ class TestCLICommands:
             cli.main()
 
         mock_add.assert_called_once_with(
-            token="sk-ant-oat01-abc", email=None, slot=None
+            token="sk-ant-oat01-abc", email=None, slot=None, base_url=None
         )
 
     def test_email_without_add_token_errors(self, capsys):
@@ -694,7 +694,7 @@ class TestCLICommands:
             cli.main()
 
         mock_add.assert_called_once_with(
-            token="mytoken", email="u@example.com", slot=None
+            token="mytoken", email="u@example.com", slot=None, base_url=None
         )
 
     def test_add_token_with_slot(self, temp_home: Path, capsys):
@@ -710,7 +710,7 @@ class TestCLICommands:
             cli.main()
 
         mock_add.assert_called_once_with(
-            token="tok", email="u@example.com", slot=3
+            token="tok", email="u@example.com", slot=3, base_url=None
         )
 
     def test_add_token_in_help(self):

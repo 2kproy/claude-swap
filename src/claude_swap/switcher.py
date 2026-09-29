@@ -3739,6 +3739,7 @@ class ClaudeAccountSwitcher:
         email: str | None = None,
         slot: int | None = None,
         assume_yes: bool = False,
+        base_url: str | None = None,
     ) -> None:
         """Register a raw OAuth setup-token or managed API key as a new account.
 
@@ -3832,6 +3833,12 @@ class ClaudeAccountSwitcher:
             self._usage_store.clear_dead_token(
                 [account_num], {account_num: (email, "")}
             )
+            if is_api_key and base_url:
+                self._set_account_base_url(seq, account_num, base_url)
+            elif base_url and not is_api_key:
+                self._logger.warning(
+                    "--base-url is ignored for OAuth setup-tokens (account %s)", account_num
+                )
             seq["lastUpdated"] = get_timestamp()
             self._write_json(self.sequence_file, seq)
             kind_label = "API key" if is_api_key else "token"
@@ -3925,6 +3932,10 @@ class ClaudeAccountSwitcher:
         }
         if is_api_key:
             record["kind"] = "api_key"
+            if base_url:
+                record["baseUrl"] = base_url
+        elif base_url:
+            self._logger.warning("--base-url is ignored for OAuth setup-tokens")
         data["accounts"][account_num] = record
         if int(account_num) not in data["sequence"]:
             data["sequence"].append(int(account_num))
@@ -6689,6 +6700,65 @@ class ClaudeAccountSwitcher:
             "or run from a normal shell."
         )
 
+    def _set_account_base_url(self, data: dict, account_num: str, base_url: str) -> None:
+        """Record a proxy base URL on an account; blank removes it."""
+        record = data.setdefault("accounts", {}).get(account_num)
+        if record is None:
+            return
+        value = (base_url or "").strip().rstrip("/")
+        if value:
+            record["baseUrl"] = value
+        else:
+            record.pop("baseUrl", None)
+
+    def account_base_url(self, account_num: str, data: dict | None = None) -> str:
+        """The proxy base URL stored on an account, or "" for none."""
+        if data is None:
+            data = self._get_sequence_data() or {}
+        record = data.get("accounts", {}).get(account_num) or {}
+        value = record.get("baseUrl")
+        return value.strip().rstrip("/") if isinstance(value, str) else ""
+
+    def _apply_account_base_url(
+        self, account_num: str, email: str, credentials: str
+    ) -> None:
+        """Apply an account's proxy base URL to the user's settings.json ``env``.
+
+        Called on the switch path, after credentials are already written, so a
+        proxy account always leaves Claude Code pointed at a host that serves it.
+        Switching away from a proxy account clears the URL -- a stale
+        ANTHROPIC_BASE_URL is worse than none, since it sends the next
+        account's key to a host that no longer serves it.
+
+        ``credentials`` is the target's stored credential: when it is a managed
+        API key it is also written to ``env.ANTHROPIC_API_KEY``, so a proxy
+        account is complete even when the key is not in ``~/.claude.json``.
+        Any failure degrades to a warning: a proxy account must not be unusable
+        because settings.json is locked, and credentials are already correct.
+        """
+        from claude_swap import user_settings as us
+
+        data = self._get_sequence_data() or {}
+        base_url = self.account_base_url(account_num, data)
+        api_key = credentials if looks_like_api_key(credentials) else None
+        try:
+            path = us.get_settings_path()
+            us.set_proxy_env(path, api_key=api_key, base_url=base_url or None)
+            if base_url:
+                self._logger.info(
+                    "Applied base URL for account %s (%s)", account_num, email
+                )
+            else:
+                self._logger.info(
+                    "Cleared base URL after switching off account %s (%s)",
+                    account_num, email,
+                )
+        except Exception as e:
+            self._logger.warning(
+                "Could not apply base URL for account %s (%s): %s",
+                account_num, email, e,
+            )
+
     def _perform_switch(
         self,
         target_account: str,
@@ -6908,6 +6978,9 @@ class ClaudeAccountSwitcher:
                         )
                     )
                     creds_written = True
+                    self._apply_account_base_url(
+                        target_account, target_email, target_creds
+                    )
 
                     # Mirror the normal switch path: preserve existing local
                     # settings/projects when ~/.claude.json already exists, only
@@ -7186,6 +7259,9 @@ class ClaudeAccountSwitcher:
                 )
                 transaction.record_step("credentials_written")
                 self._logger.info("Wrote target credentials")
+                self._apply_account_base_url(
+                    target_account, target_email, target_creds
+                )
 
                 # Step 4: Update config with target oauthAccount
                 target_config_data = json.loads(target_config)

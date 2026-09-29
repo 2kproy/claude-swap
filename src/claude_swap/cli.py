@@ -1154,6 +1154,15 @@ The original flag spellings (%(prog)s --switch, %(prog)s --list, ...) keep worki
         help="Limit export to one account (use with 'export')",
     )
     parser.add_argument(
+        "--base-url",
+        metavar="URL",
+        help=(
+            "Proxy base URL for a third-party API provider (use with 'add-token', "
+            "API keys only). Applied to settings.json env.ANTHROPIC_BASE_URL when "
+            "switching to this account; e.g. https://api.example.com"
+        ),
+    )
+    parser.add_argument(
         "--alias",
         metavar="NAME",
         help="Set a short display alias for the account (use with 'add')",
@@ -1414,6 +1423,7 @@ The original flag spellings (%(prog)s --switch, %(prog)s --list, ...) keep worki
                 token=args.add_token,
                 email=args.email,
                 slot=args.slot,
+                base_url=args.base_url,
             )
         elif args.remove_account:
             switcher.remove_account(args.remove_account)

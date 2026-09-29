@@ -377,6 +377,32 @@ setup-token. It switches like any other account; since API keys have no subscrip
 quota, they show no usage and the usage-aware `switch` strategies never skip them as
 rate-limited.
 
+### Third-party proxy API keys (`--base-url`)
+
+Some providers sell access to Claude models through their own proxy rather than
+Anthropic's API directly. Such a key is useless unless Claude Code is pointed at
+the proxy host via `ANTHROPIC_BASE_URL`, which lives in `~/.claude/settings.json`
+-- a file claude-swap normally never touches. The `--base-url` flag closes that
+gap: the URL is stored on the account and (re)applied to `settings.json` every
+time you switch to it, so a proxy account is complete after a single `switch`.
+
+```bash
+cswap add-token sk-ant-prox... --email proxy@provider.com \
+     --base-url https://api.example.com
+
+cswap switch proxy@provider.com
+```
+
+Switching **away** from a proxy account removes `ANTHROPIC_BASE_URL` and
+`ANTHROPIC_API_KEY` from `settings.json`, so an OAuth account you move to is not
+still pointed at a host that no longer serves it. Every other key in
+`settings.json` (`model`, `enabledPlugins`, your own `env` entries, flags) is
+preserved exactly as you left it -- cswap only owns those two env vars.
+
+`--base-url` is API-key accounts only: on an OAuth setup-token it is ignored with
+a warning, since a proxy URL and OAuth credentials cannot both apply to one
+account.
+
 ## Uninstall
 
 Remove all data:
